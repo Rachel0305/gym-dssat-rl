@@ -11,7 +11,7 @@ class NullAgent:
 
     def predict(self, obs, state=None, episode_start=None, deterministic=None):
         action = normalize_action((self.env.action_low, self.env.action_high), [0])
-        return np.array([action], dtype=np.float32), obs
+        return np.array(action, dtype=np.float32), obs
 
 
 class ExpertAgent:
@@ -29,11 +29,10 @@ class ExpertAgent:
         self.normalize_action = normalize_action
 
     def _policy(self, obs):
-        dap = int(obs[0][0])
+        dap = int(obs[0])
         return [self.fertilization_dic[dap] if dap in self.fertilization_dic else 0]
 
     def predict(self, obs, state=None, episode_start=None, deterministic=None):
         action = self._policy(obs)
         action = normalize_action((self.env.action_low, self.env.action_high), action)
-
-        return np.array([action], dtype=np.float32), obs
+        return np.array(action, dtype=np.float32), obs

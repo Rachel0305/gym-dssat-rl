@@ -1,1 +1,1 @@
-#Simple baselines of gym-DSSAT using Stable-Baselines3
+# Simple baselines for gym-DSSAT using PPO from Stable-Baselines3

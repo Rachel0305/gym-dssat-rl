@@ -1,19 +1,20 @@
 import gym
 import numpy as np
-
+import pdb
 
 # helpers for action normalization
 def normalize_action(action_space_limits, action):
     """Normalize the action from [low, high] to [-1, 1]"""
     low, high = action_space_limits
-    return 2.0 * ((action - low) / (high - low)) - 1.0
+    normalized_action = 2.0 * ((action - low) / (high - low)) - 1.0
+    return normalized_action
 
 
 def denormalize_action(action_space_limits, action):
     """Denormalize the action from [-1, 1] to [low, high]"""
     low, high = action_space_limits
-    return low + (0.5 * (action + 1.0) * (high - low))
-
+    denormalized_action = low + (0.5 * (action + 1.0) * (high - low))
+    return denormalized_action
 
 # Wrapper for easy and uniform interfacing with SB3
 class GymDssatWrapper(gym.Wrapper):
