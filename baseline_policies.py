@@ -1,6 +1,7 @@
 # Baseline agents for comparison
 from sb3_wrapper import normalize_action
 import numpy as np
+import pdb
 
 class NullAgent:
     """
@@ -29,6 +30,7 @@ class ExpertAgent:
         self.normalize_action = normalize_action
 
     def _policy(self, obs):
+        obs = np.concatenate(obs, axis=None)
         dap = int(obs[0])
         return [self.fertilization_dic[dap] if dap in self.fertilization_dic else 0]
 

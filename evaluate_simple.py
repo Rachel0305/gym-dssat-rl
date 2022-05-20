@@ -43,7 +43,7 @@ if __name__ == '__main__':
     try:
         ppo_best = PPO.load(f'./output/best_model')
         agents = {
-            # 'null': NullAgent(env),
+            'null': NullAgent(env),
             'ppo': ppo_best,
             'expert': ExpertAgent(env)}
 

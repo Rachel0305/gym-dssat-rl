@@ -2,12 +2,12 @@ from stable_baselines3 import PPO
 from baseline_policies import NullAgent, ExpertAgent
 from sb3_wrapper import GymDssatWrapper
 from stable_baselines3.common.monitor import Monitor
+from gym_dssat_pdi.envs.utils import utils
 import gym
 import pickle
 import os
 import numpy as np
 import pdb
-
 
 def evaluate(agent, n_episodes=100):
     # Create eval env
@@ -47,20 +47,23 @@ if __name__ == '__main__':
 
     source_env = gym.make('gym_dssat_pdi:GymDssatPdi-v0', **env_args)
     env = Monitor(GymDssatWrapper(source_env))
-    n_episodes = 10
+    n_episodes = 1000
     try:
         ppo_best = PPO.load(f'./output/best_model')
         agents = {
             'null': NullAgent(env),
             'ppo': ppo_best,
             'expert': ExpertAgent(env)}
+
         all_histories = {}
         for agent_name in [*agents]:
             agent = agents[agent_name]
             print(f'Evaluating {agent_name} agent...')
             histories = evaluate(agent, n_episodes=n_episodes)
+            histories = utils.transpose_dicts(histories)
             all_histories[agent_name] = histories
             print('Done')
+
         saving_path = f'./output/evaluation_histories.pkl'
         with open(saving_path, 'wb') as handle:
             pickle.dump(all_histories, handle, protocol=pickle.HIGHEST_PROTOCOL)

@@ -44,7 +44,9 @@ class GymDssatWrapper(gym.Wrapper):
         return box.low, box.high
 
     def _format_action(self, action):
-        return {'anfer': action[0]}
+        if isinstance(action, (list, np.ndarray)):
+            action, = action
+        return {'anfer': action}
 
     def _format_observation(self, observation):
         return self.env.observation_dict_to_array(observation)

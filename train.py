@@ -23,6 +23,7 @@ if __name__ == '__main__':
         # Training arguments for PPO agent
         ppo_args = {
             'seed': 123,  # seed training for reproducibility
+            # 'gamma': .98,
         }
 
         # Create the agent
@@ -41,8 +42,8 @@ if __name__ == '__main__':
                                      deterministic=True)
 
         # Train
-        total_timesteps = 500_000
-        # total_timesteps = 1_000_000
+        # total_timesteps = 500_000
+        total_timesteps = 1_000_000
         print('Training PPO agent...')
         ppo_agent.learn(total_timesteps=total_timesteps, callback=eval_callback)
         ppo_agent.save(f'./{path}/final_model')

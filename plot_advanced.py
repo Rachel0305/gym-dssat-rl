@@ -1,0 +1,302 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
+from pylab import rcParams
+figsize = (8, 6)
+rcParams['figure.figsize'] = figsize
+import seaborn as sns
+
+sns.set_context('paper', font_scale=2)
+import pandas as pd
+import pickle
+from pprint import pprint
+import itertools
+import pdb
+
+font_scale = 10
+
+
+def load_data(path):
+    with open(path, 'rb') as f_:
+        histories = pickle.load(f_)
+    return histories
+
+
+def get_actions(history_dict):
+    action_dic = {}
+    for key in [*history_dict]:
+        action_dic[key] = []
+        for episode_history in history_dict[key]['action']:
+            action_dic[key].append([action['anfer'] for action in episode_history])
+    return action_dic
+
+
+def get_rewards(history_dict):
+    reward_dic = {}
+    for key in [*history_dict]:
+        reward_dic[key] = []
+        for episode_history in history_dict[key]:
+            reward_dic[key].append([episode_history['reward']])
+    return reward_dic
+
+
+def get_feature(history_dict, feature):
+    feature_dic = {}
+    for key in [*history_dict]:
+        feature_dic[key] = []
+        for episode_history in history_dict[key]:
+            feature_dic[key].append([state[feature] for state in episode_history['state']])
+    return feature_dic
+
+
+def plot_actions(history_dict, saving_path, keys=None):
+    if keys is None:
+        keys = [*history_dict]
+    episode_lengths = []
+    all_actions = get_actions(history_dict)
+    replications = 0
+    for key in keys:
+        for actions_ in all_actions[key]:
+            replications += 1
+            episode_lengths.append(len(actions_))
+    max_episode_length = max(episode_lengths)
+    steps = range(1, max_episode_length + 1)
+    dict_for_df = {'step': [], 'action': [], 'policy': []}
+    for index, key in enumerate(keys):
+        actions = all_actions[key]
+        all_actions_list = []
+        all_steps = []
+        for actions_ in actions:
+            nan_to_fill = [np.nan for _ in range(max_episode_length - len(actions_))]
+            actions_.extend(nan_to_fill)
+            all_actions_list.extend(actions_)
+            all_steps.extend(steps)
+        dict_for_df['step'].extend(all_steps)
+        dict_for_df['policy'].extend(np.repeat(key, len(all_steps)))
+        dict_for_df['action'].extend(all_actions_list)
+    df = pd.DataFrame.from_dict(dict_for_df)
+    df = df[df['action'] > 0]
+    palette = sns.color_palette('cool_r', len([*history_dict]))[:len(keys)]
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.histplot(df, x='step', y='action', hue='policy', bins=15, palette=palette, ax=ax)
+    ax.set_xlabel('day')
+    # ax.set_xlim(1, max_episode_length)
+    ax.set_ylabel('fertilizer quantity (kg/ha)')
+    move_legend(ax, "upper left")
+    ax.legend_.set_title(None)
+    fig.set_size_inches(8, 6)
+    plt.tight_layout()
+    ax.yaxis.set_label_coords(-.07, .5)
+    ax.xaxis.set_label_coords(.5, -.08)
+    plt.subplots_adjust(top=0.95)
+    plt.title(f'Nitrogen fertilizer applications ({replications} replications)')
+    plt.savefig(saving_path)
+
+
+def plot_rewards(history_dict, cut=155, y_logscale=False, y_label=None, x_logscale=False, x_label=None, q_high=.95,
+                 q_low=.05,
+                 saving_path=None, title=None):
+    reward_dict = get_rewards(history_dict)
+    policy_names = [*reward_dict]
+    if saving_path is None:
+        saving_path = f'fertilization_policy_rewards.pdf'
+    colors = sns.color_palette('cool_r', len([*reward_dict]))
+    dashes = ['dashed', 'solid', 'dotted']
+    dashes = itertools.cycle(dashes)
+    markers = ['*', 'X', '^']
+    markers = itertools.cycle(markers)
+    legend_elements = []
+    fig, ax = plt.subplots(figsize=(8, 6))
+    for index, (policy_name, color) in enumerate(zip(policy_names, colors)):
+        dash = next(dashes)
+        rewards = reward_dict[policy_name]
+        rewards_ = []
+        replications = 0
+        for reward in rewards:
+            replications += 1
+            if len(reward[0]) > cut:
+                rewards_.append(reward[0][:cut])
+        rewards = np.asarray(rewards_).cumsum(axis=1)
+        _, horizon = rewards.shape
+        marker = next(markers)
+        alpha_q = .1
+        linewidth = 2
+        if index == 0:
+            zorder = 2
+        else:
+            zorder = 1
+        quantiles_cum_reward_low = np.quantile(rewards, q=q_low, axis=0)
+        quantiles_cum_reward_high = np.quantile(rewards, q=q_high, axis=0)
+        mean_regret = np.mean(rewards, axis=0)
+        x = np.array(range(1, horizon + 1))
+        line = ax.plot(x, mean_regret, color=color, linewidth=linewidth, linestyle=dash,
+                       zorder=zorder + 2)
+        x_points_step = horizon // 10
+        x_points = range(x_points_step, horizon, x_points_step)
+        common_x_indexes = [i for i, x in enumerate(x) if x in x_points]
+        y_points = mean_regret[common_x_indexes]
+        points = ax.plot(x_points, y_points, color=color, marker=marker, zorder=zorder + 2,
+                         linestyle='', markersize=10, lw=3)
+        legend_element = Line2D([None], [None], lw=2, label=policy_name, linestyle=dash, marker=marker,
+                                linewidth=linewidth, color=color, markersize=10)
+        legend_elements.append(legend_element)
+        ax.fill_between(x=x, y1=quantiles_cum_reward_low, y2=quantiles_cum_reward_high, color=color,
+                        zorder=zorder - 1, alpha=alpha_q)
+        ax.plot(x, quantiles_cum_reward_low, color=color, linewidth=1, linestyle=dash, zorder=zorder)
+        ax.plot(x, quantiles_cum_reward_high, color=color, linewidth=1, linestyle=dash, zorder=zorder)
+    # loc = plticker.MultipleLocator(base=1)
+    # ax.xaxis.set_major_locator(loc)
+    if x_logscale:
+        ax.set_xscale('log')
+    if y_logscale:
+        ax.set_yscale('log')
+    if x_label is None:
+        x_label = 'day'
+        if x_logscale:
+            x_label = f'{x_label[:-1]} log(t)'
+    ax.set_xlabel(x_label)
+    if y_label is None:
+        y_label = 'return'
+    if y_logscale:
+        y_label = f'log {y_label}'
+    ax.set_ylabel(y_label)
+    patch = Patch(facecolor='black', edgecolor=None, label=f'[{q_low:.02f},{q_high:.02f}] quantile range',
+                  alpha=.2)
+    legend_elements.append(patch)
+    # ax.grid(axis='both')
+    ax.legend(handles=legend_elements, loc='best')
+    if title is None:
+        title = f'Policy returns ({replications} replications)'
+    plt.title(title)
+    ax.tick_params(axis='both', which='major', pad=3)
+    plt.tight_layout()
+    ax.yaxis.set_label_coords(-.07, .5)
+    ax.xaxis.set_label_coords(.5, -.08)
+    plt.savefig(saving_path)
+    plt.close(fig)
+
+
+def get_nitrogen_efficiency_stats(history_dict):
+    keys = [*history_dict]
+    res_dict = {key: {} for key in keys}
+    for key in keys:
+        yield_dict = get_feature(history_dict, 'grnwt')
+        cumsumfert_dict = get_feature(history_dict, 'cumsumfert')
+        yield_values = [yields[-1] for yields in yield_dict[key]]
+        cumsumfert_values = [cumsumferts[-1] for cumsumferts in cumsumfert_dict[key]]
+        cumsumfert_values_masked = np.ma.masked_where(cumsumfert_values == 0, cumsumfert_values)
+        yield_values_masked = np.ma.masked_where(np.ma.getmask(cumsumfert_values_masked), yield_values)
+        nitrogen_efficiencies = yield_values_masked / cumsumfert_values_masked
+        res_dict[key]['mean'] = np.mean(nitrogen_efficiencies)
+        res_dict[key]['std'] = np.std(nitrogen_efficiencies, ddof=1)
+    print(f'\n ### nitrogen efficiency statistics ###\n')
+    pprint(res_dict)
+
+
+def get_feature_stats(history_dict, feature):
+    keys = [*history_dict]
+    res_dict = {key: {} for key in keys}
+    for key in keys:
+        feature_dict = get_feature(history_dict, feature)
+        feature_values = [values[-1] for values in feature_dict[key]]
+        res_dict[key]['mean'] = np.mean(feature_values)
+        res_dict[key]['std'] = np.std(feature_values, ddof=1)
+    print(f'\n ### {feature} statistics ###\n')
+    pprint(res_dict)
+
+
+def get_number_of_applications(history_dict):
+    keys = [*history_dict]
+    all_actions = get_actions(history_dict)
+    count_dict = {key: {} for key in keys}
+    for key in keys:
+        count = []
+        for action_episode in all_actions[key]:
+            count.append((np.asarray(action_episode) > 0).sum())
+        count_dict[key]['mean'] = np.mean(count)
+        count_dict[key]['std'] = np.std(count, ddof=1)
+    print(f'\n ### number of application statistics ###\n')
+    pprint(count_dict)
+
+
+def get_duration_statistics(history_dict):
+    keys = [*history_dict]
+    all_actions = get_actions(history_dict)
+    count_dict = {key: {} for key in keys}
+    for key in keys:
+        count = []
+        for action_episode in all_actions[key]:
+            count.append(len(action_episode))
+        count_dict[key]['mean'] = np.mean(count)
+        count_dict[key]['std'] = np.std(count, ddof=1)
+    print(f'\n ### episode length statistics ###\n')
+    pprint(count_dict)
+
+
+def get_statistics(history_dict):
+    features = ['grnwt', 'pcngrn', 'cumsumfert', 'cleach', 'efficiency', 'duration', 'napp']
+    state_features_dic = {key: {feature: [] for feature in features} for key in [*history_dict]}
+
+    for key in [*history_dict]:
+        for repetition_index, repetition in enumerate(history_dict[key]['state']):
+            last_state = repetition[-1]
+            for feature in ['grnwt', 'pcngrn', 'cumsumfert', 'cleach']:
+                values = last_state[feature]
+                state_features_dic[key][feature].append(values)
+
+
+    for key in [*history_dict]:
+        grnwt_rep = state_features_dic[key]['grnwt']
+        grnwt_0_rep = state_features_dic['null']['grnwt']
+        cumsumfert_rep = state_features_dic[key]['cumsumfert']
+        for grnwt, grnwt_0, cumsumfert in zip(grnwt_rep, grnwt_0_rep, cumsumfert_rep):
+                if cumsumfert == 0:
+                    value = np.nan
+                else:
+                    value = (grnwt - grnwt_0) / cumsumfert
+                state_features_dic[key]['efficiency'].append(value)
+
+    for key in [*history_dict]:
+        for applications in history_dict[key]['action']:
+            applications = [application['anfer'] for application in applications]
+            state_features_dic[key]['napp'].append((np.asarray(applications) > 0).sum())
+            state_features_dic[key]['duration'].append(len(applications))
+
+    df = make_df_from_dict(state_features_dic)
+    return df
+
+def make_df_from_dict(state_features_dic):
+    df_dic = {}
+    keys = [*state_features_dic]
+    for key in keys:
+        features = [*state_features_dic[key]]
+        features_key = [f'{feature}_{key}' for feature in features]
+        for feature, feature_key in zip(features, features_key):
+            values = state_features_dic[key][feature]
+            if feature == 'pcngrn':
+                values = 100 * np.asarray(values)
+                feature_key += '_pct'
+            df_dic[feature_key] = values
+    df = pd.DataFrame.from_dict(df_dic, orient='columns')
+    args = np.argsort(df.columns)
+    df = df.iloc[:, args]
+    return df
+
+def move_legend(ax, new_loc, **kws):
+    """
+    from https://github.com/mwaskom/seaborn/issues/2280
+    """
+    old_legend = ax.legend_
+    handles = old_legend.legendHandles
+    labels = [t.get_text() for t in old_legend.get_texts()]
+    title = old_legend.get_title().get_text()
+    ax.legend(handles, labels, loc=new_loc, title=title, **kws)
+
+
+if __name__ == '__main__':
+    history_dict = load_data(path='./output/evaluation_histories.pkl')
+    plot_actions(history_dict=history_dict, saving_path='./figures/applications.pdf', keys=['ppo', 'expert'])
+    plot_rewards(history_dict=history_dict, saving_path='./figures/rewards.pdf')
+    df = get_statistics(history_dict=history_dict)
+    df.describe().round(1).to_csv('./output/advanced_evaluation.csv', index_label=True)
