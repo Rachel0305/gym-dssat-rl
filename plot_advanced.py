@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from pylab import rcParams
+
 figsize = (8, 6)
 rcParams['figure.figsize'] = figsize
 import seaborn as sns
@@ -36,18 +37,9 @@ def get_rewards(history_dict):
     reward_dic = {}
     for key in [*history_dict]:
         reward_dic[key] = []
-        for episode_history in history_dict[key]:
-            reward_dic[key].append([episode_history['reward']])
+        for episode_history in history_dict[key]['reward']:
+            reward_dic[key].append(episode_history)
     return reward_dic
-
-
-def get_feature(history_dict, feature):
-    feature_dic = {}
-    for key in [*history_dict]:
-        feature_dic[key] = []
-        for episode_history in history_dict[key]:
-            feature_dic[key].append([state[feature] for state in episode_history['state']])
-    return feature_dic
 
 
 def plot_actions(history_dict, saving_path, keys=None):
@@ -56,9 +48,10 @@ def plot_actions(history_dict, saving_path, keys=None):
     episode_lengths = []
     all_actions = get_actions(history_dict)
     replications = 0
-    for key in keys:
+    for index, key in enumerate(keys):
         for actions_ in all_actions[key]:
-            replications += 1
+            if index == 0:
+                replications += 1
             episode_lengths.append(len(actions_))
     max_episode_length = max(episode_lengths)
     steps = range(1, max_episode_length + 1)
@@ -77,10 +70,14 @@ def plot_actions(history_dict, saving_path, keys=None):
         dict_for_df['action'].extend(all_actions_list)
     df = pd.DataFrame.from_dict(dict_for_df)
     df = df[df['action'] > 0]
-    palette = sns.color_palette('cool_r', len([*history_dict]))[:len(keys)]
+    # colors = sns.color_palette('cool_r', len([*history_dict]))[:-1]
+    colors = [(0.4980392156862745, 0.5019607843137255, 1.0),
+              (0.24705882352941178, 0.7529411764705882, 1.0),
+              (0.7490196078431373, 0.25098039215686274, 1.0),
+              ][1:]
     fig, ax = plt.subplots(figsize=(8, 6))
-    sns.histplot(df, x='step', y='action', hue='policy', bins=15, palette=palette, ax=ax)
-    ax.set_xlabel('day')
+    sns.histplot(df, x='step', y='action', hue='policy', bins=15, palette=colors, ax=ax)
+    ax.set_xlabel('day of simulation')
     # ax.set_xlim(1, max_episode_length)
     ax.set_ylabel('fertilizer quantity (kg/ha)')
     move_legend(ax, "upper left")
@@ -94,29 +91,34 @@ def plot_actions(history_dict, saving_path, keys=None):
     plt.savefig(saving_path)
 
 
-def plot_rewards(history_dict, cut=155, y_logscale=False, y_label=None, x_logscale=False, x_label=None, q_high=.95,
+def plot_rewards(history_dict, dos_cut=155, y_logscale=False, y_label=None, x_logscale=False, x_label=None, q_high=.95,
                  q_low=.05,
                  saving_path=None, title=None):
     reward_dict = get_rewards(history_dict)
     policy_names = [*reward_dict]
     if saving_path is None:
         saving_path = f'fertilization_policy_rewards.pdf'
-    colors = sns.color_palette('cool_r', len([*reward_dict]))
+    # colors = sns.color_palette('cool_r', len([*reward_dict]))
+    colors = [(0.4980392156862745, 0.5019607843137255, 1.0),
+              (0.24705882352941178, 0.7529411764705882, 1.0),
+              (0.7490196078431373, 0.25098039215686274, 1.0),
+              ]
     dashes = ['dashed', 'solid', 'dotted']
     dashes = itertools.cycle(dashes)
     markers = ['*', 'X', '^']
     markers = itertools.cycle(markers)
     legend_elements = []
     fig, ax = plt.subplots(figsize=(8, 6))
+    replications = 0
     for index, (policy_name, color) in enumerate(zip(policy_names, colors)):
         dash = next(dashes)
         rewards = reward_dict[policy_name]
         rewards_ = []
-        replications = 0
         for reward in rewards:
-            replications += 1
-            if len(reward[0]) > cut:
-                rewards_.append(reward[0][:cut])
+            if index == 0:
+                replications += 1
+            if len(reward) > dos_cut:
+                rewards_.append(reward[:dos_cut])
         rewards = np.asarray(rewards_).cumsum(axis=1)
         _, horizon = rewards.shape
         marker = next(markers)
@@ -152,12 +154,12 @@ def plot_rewards(history_dict, cut=155, y_logscale=False, y_label=None, x_logsca
     if y_logscale:
         ax.set_yscale('log')
     if x_label is None:
-        x_label = 'day'
+        x_label = 'day of simulation'
         if x_logscale:
             x_label = f'{x_label[:-1]} log(t)'
     ax.set_xlabel(x_label)
     if y_label is None:
-        y_label = 'return'
+        y_label = 'cumulated return (kg N/ha)'
     if y_logscale:
         y_label = f'log {y_label}'
     ax.set_ylabel(y_label)
@@ -177,63 +179,6 @@ def plot_rewards(history_dict, cut=155, y_logscale=False, y_label=None, x_logsca
     plt.close(fig)
 
 
-def get_nitrogen_efficiency_stats(history_dict):
-    keys = [*history_dict]
-    res_dict = {key: {} for key in keys}
-    for key in keys:
-        yield_dict = get_feature(history_dict, 'grnwt')
-        cumsumfert_dict = get_feature(history_dict, 'cumsumfert')
-        yield_values = [yields[-1] for yields in yield_dict[key]]
-        cumsumfert_values = [cumsumferts[-1] for cumsumferts in cumsumfert_dict[key]]
-        cumsumfert_values_masked = np.ma.masked_where(cumsumfert_values == 0, cumsumfert_values)
-        yield_values_masked = np.ma.masked_where(np.ma.getmask(cumsumfert_values_masked), yield_values)
-        nitrogen_efficiencies = yield_values_masked / cumsumfert_values_masked
-        res_dict[key]['mean'] = np.mean(nitrogen_efficiencies)
-        res_dict[key]['std'] = np.std(nitrogen_efficiencies, ddof=1)
-    print(f'\n ### nitrogen efficiency statistics ###\n')
-    pprint(res_dict)
-
-
-def get_feature_stats(history_dict, feature):
-    keys = [*history_dict]
-    res_dict = {key: {} for key in keys}
-    for key in keys:
-        feature_dict = get_feature(history_dict, feature)
-        feature_values = [values[-1] for values in feature_dict[key]]
-        res_dict[key]['mean'] = np.mean(feature_values)
-        res_dict[key]['std'] = np.std(feature_values, ddof=1)
-    print(f'\n ### {feature} statistics ###\n')
-    pprint(res_dict)
-
-
-def get_number_of_applications(history_dict):
-    keys = [*history_dict]
-    all_actions = get_actions(history_dict)
-    count_dict = {key: {} for key in keys}
-    for key in keys:
-        count = []
-        for action_episode in all_actions[key]:
-            count.append((np.asarray(action_episode) > 0).sum())
-        count_dict[key]['mean'] = np.mean(count)
-        count_dict[key]['std'] = np.std(count, ddof=1)
-    print(f'\n ### number of application statistics ###\n')
-    pprint(count_dict)
-
-
-def get_duration_statistics(history_dict):
-    keys = [*history_dict]
-    all_actions = get_actions(history_dict)
-    count_dict = {key: {} for key in keys}
-    for key in keys:
-        count = []
-        for action_episode in all_actions[key]:
-            count.append(len(action_episode))
-        count_dict[key]['mean'] = np.mean(count)
-        count_dict[key]['std'] = np.std(count, ddof=1)
-    print(f'\n ### episode length statistics ###\n')
-    pprint(count_dict)
-
-
 def get_statistics(history_dict):
     features = ['grnwt', 'pcngrn', 'cumsumfert', 'cleach', 'efficiency', 'duration', 'napp']
     state_features_dic = {key: {feature: [] for feature in features} for key in [*history_dict]}
@@ -245,17 +190,16 @@ def get_statistics(history_dict):
                 values = last_state[feature]
                 state_features_dic[key][feature].append(values)
 
-
     for key in [*history_dict]:
         grnwt_rep = state_features_dic[key]['grnwt']
         grnwt_0_rep = state_features_dic['null']['grnwt']
         cumsumfert_rep = state_features_dic[key]['cumsumfert']
         for grnwt, grnwt_0, cumsumfert in zip(grnwt_rep, grnwt_0_rep, cumsumfert_rep):
-                if cumsumfert == 0:
-                    value = np.nan
-                else:
-                    value = (grnwt - grnwt_0) / cumsumfert
-                state_features_dic[key]['efficiency'].append(value)
+            if cumsumfert == 0:
+                value = np.nan
+            else:
+                value = (grnwt - grnwt_0) / cumsumfert
+            state_features_dic[key]['efficiency'].append(value)
 
     for key in [*history_dict]:
         for applications in history_dict[key]['action']:
@@ -265,6 +209,7 @@ def get_statistics(history_dict):
 
     df = make_df_from_dict(state_features_dic)
     return df
+
 
 def make_df_from_dict(state_features_dic):
     df_dic = {}
@@ -282,6 +227,7 @@ def make_df_from_dict(state_features_dic):
     args = np.argsort(df.columns)
     df = df.iloc[:, args]
     return df
+
 
 def move_legend(ax, new_loc, **kws):
     """
