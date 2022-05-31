@@ -4,7 +4,7 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from pylab import rcParams
 from gym_dssat_pdi.envs.utils import utils as dssat_utils
-
+import matplotlib.ticker as plticker
 figsize = (8, 6)
 rcParams['figure.figsize'] = figsize
 import seaborn as sns
@@ -80,7 +80,11 @@ def plot_actions(history_dict, mode, saving_path, keys=None):
               (0.7490196078431373, 0.25098039215686274, 1.0),
               ][1:]
     fig, ax = plt.subplots(figsize=(8, 6))
-    sns.histplot(df, x='step', y='action', hue='policy', bins=15, palette=colors, ax=ax)
+    if mode == 'fertilization':
+        ylocator = 10
+    else:
+        ylocator = 5
+    sns.histplot(df, x='step', y='action', hue='policy', binwidth=(10, ylocator), palette=colors, ax=ax)
     ax.set_xlabel('day of simulation')
     # ax.set_xlim(1, max_episode_length)
     if mode == 'fertilization':
@@ -96,8 +100,15 @@ def plot_actions(history_dict, mode, saving_path, keys=None):
     plt.tight_layout()
     ax.yaxis.set_label_coords(-.07, .5)
     ax.xaxis.set_label_coords(.5, -.08)
+    ax.xaxis.set_major_locator(plticker.MultipleLocator(base=20.0))
+    ax.xaxis.set_minor_locator(plticker.MultipleLocator(base=10.0))
+    if mode == 'irrigation':
+        ax.yaxis.set_major_locator(plticker.MultipleLocator(base=10.0))
+        ax.yaxis.set_minor_locator(plticker.MultipleLocator(base=5))
+    else:
+        ax.yaxis.set_major_locator(plticker.MultipleLocator(base=20.0))
+        ax.yaxis.set_minor_locator(plticker.MultipleLocator(base=10.0))
     plt.subplots_adjust(top=0.95)
-
     plt.title(title)
     plt.savefig(saving_path)
 
@@ -185,6 +196,8 @@ def plot_rewards(history_dict, mode, dos_cut=155, y_logscale=False, y_label=None
     ax.tick_params(axis='both', which='major', pad=3)
     ax.yaxis.set_label_coords(-.07, .5)
     ax.xaxis.set_label_coords(.5, -.08)
+    ax.xaxis.set_minor_locator(plticker.MultipleLocator(base=10.0))
+    ax.xaxis.set_major_locator(plticker.MultipleLocator(base=20.0))
     if mode == 'irrigation':
         ax.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
     plt.tight_layout()
@@ -248,11 +261,25 @@ def get_growing_stage_occurences(history_dict):
                     istage_dic[istage_atom] = []
                 istage_dic[istage_atom].append(first_occurence_das)
         for istage_atom in [*istage_dic]:
-            growing_stage_dict[key][istage_atom] = np.mean(istage_dic[istage_atom])
+            growing_stage_dict[key][f'{istage_atom}_mean'] = np.mean(istage_dic[istage_atom])
+            growing_stage_dict[key][f'{istage_atom}_std'] = np.std(istage_dic[istage_atom], ddof=1)
     df = pd.DataFrame.from_dict(growing_stage_dict, orient='index')
-    column_order = [7, 8, 9, 1, 2, 3, 4, 5, 6]
+    istage_order = [7, 8, 9, 1, 2, 3, 4, 5, 6]
+    column_order = []
+    for istage in istage_order:
+        column_order.append(f'{istage}_mean')
+        column_order.append(f'{istage}_std')
     df = df[column_order]
     return df
+
+def check_dap(history_dict):
+    for key in [*history_dict]:
+        sowing_das = []
+        for repetition_index, repetition in enumerate(history_dict[key]['state']):
+            daps = [state['dap'] for state in repetition]
+            sowing_das.append(daps.index(1))
+        print(f'min sowing das : {max(sowing_das)} for {key}')
+        print(f'max sowing das : {min(sowing_das)} for {key}')
 
 
 def make_df_from_dict(state_features_dic):
@@ -285,16 +312,18 @@ def move_legend(ax, new_loc, **kws):
 
 
 if __name__ == '__main__':
-    mode = 'fertilization'
-    # mode = 'irrigation'
+    # mode = 'fertilization'
+    mode = 'irrigation'
     print(f'###########################\n## MODE: {mode} ##\n###########################')
     for dir in [f'./figures/{mode}']:
         dssat_utils.make_folder(dir)
     history_dict = load_data(path=f'./output/{mode}/evaluation_histories.pkl')
+    # check_dap(history_dict)
     df_stages = get_growing_stage_occurences(history_dict)
-    df_stages.to_csv(f'./output/{mode}/growing_stages.csv', index_label=True)
+    df_stages.transpose().round(0).to_csv(f'./output/{mode}/growing_stages.csv', index_label='istage')
     action_keys = ['ppo', 'expert']
-    plot_actions(history_dict=history_dict, mode=mode, saving_path=f'./figures/{mode}/applications.pdf', keys=action_keys)
-    plot_rewards(history_dict=history_dict, mode=mode, saving_path=f'./figures/{mode}/rewards.pdf')
+    plot_actions(history_dict=history_dict, mode=mode, saving_path=f'./figures/{mode}/{mode}Applications.pdf',
+                 keys=action_keys)
+    plot_rewards(history_dict=history_dict, mode=mode, saving_path=f'./figures/{mode}/{mode}Rewards.pdf')
     df_stats = get_statistics(history_dict=history_dict, mode=mode)
-    df_stats.describe().round(1).to_csv(f'./output/{mode}/advanced_evaluation.csv', index_label=True)
+    df_stats.describe().round(1).to_csv(f'./output/{mode}/advanced_evaluation.csv')

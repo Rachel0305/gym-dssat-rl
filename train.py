@@ -14,8 +14,8 @@ if __name__ == '__main__':
         env_args = {
             'run_dssat_location': '/opt/dssat_pdi/run_dssat',
             'log_saving_path': './logs/dssat_pdi.log',
-            'mode': 'fertilization',
-            # 'mode': 'irrigation',
+            # 'mode': 'fertilization',
+            'mode': 'irrigation',
             'seed': 123,
             'random_weather': True,
         }
