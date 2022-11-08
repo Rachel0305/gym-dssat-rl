@@ -210,7 +210,7 @@ def get_statistics(history_dict, mode):
         features_subset = ['topwt', 'grnwt', 'pcngrn', 'cumsumfert', 'cleach']
         action_name = 'anfer'
     else:
-        features_subset = ['topwt', 'grnwt', 'totir', 'runoff']
+        features_subset = ['topwt', 'grnwt', 'totir', 'runoff', 'cleach']
         action_name = 'amir'
     features = [*features_subset, 'efficiency', 'duration', 'napp']
 
@@ -312,8 +312,8 @@ def move_legend(ax, new_loc, **kws):
 
 
 if __name__ == '__main__':
-    # mode = 'fertilization'
-    mode = 'irrigation'
+    mode = 'fertilization'
+    # mode = 'irrigation'
     print(f'###########################\n## MODE: {mode} ##\n###########################')
     for dir in [f'./figures/{mode}']:
         dssat_utils.make_folder(dir)

@@ -32,9 +32,8 @@ def evaluate(agent, eval_args, n_episodes=100):
 if __name__ == '__main__':
 
     env_args = {
-        'run_dssat_location': '/opt/dssat_pdi/run_dssat',
-        # 'mode': 'fertilization',
-        'mode': 'irrigation',
+        'mode': 'fertilization',
+        # 'mode': 'irrigation',
         'seed': 123,
         'random_weather': True,
         'evaluation': True,  # isolated seeds for weather generation
@@ -49,7 +48,7 @@ if __name__ == '__main__':
     env = Monitor(GymDssatWrapper(source_env))
     n_episodes = 1000
     try:
-        ppo_best = PPO.load(f'./output/{env_args["mode"]}/best_model_bckp')
+        ppo_best = PPO.load(f'./output/{env_args["mode"]}/best_model')
         agents = {
             'null': NullAgent(env),
             'ppo': ppo_best,

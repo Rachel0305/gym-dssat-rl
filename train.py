@@ -7,15 +7,14 @@ import gym
 
 if __name__ == '__main__':
     try:
-        for dir in ['./output', 'logs']:
+        for dir in ['./output', './logs']:
             dssat_utils.make_folder(dir)
 
         # Create environment
         env_args = {
-            'run_dssat_location': '/opt/dssat_pdi/run_dssat',
             'log_saving_path': './logs/dssat_pdi.log',
-            # 'mode': 'fertilization',
-            'mode': 'irrigation',
+            'mode': 'fertilization',
+            # 'mode': 'irrigation',
             'seed': 123,
             'random_weather': True,
         }
