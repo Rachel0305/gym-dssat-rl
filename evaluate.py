@@ -22,10 +22,11 @@ def evaluate(agent, eval_args, n_episodes=100):
     env = GymDssatWrapper(source_env)
 
     all_histories = []
+
     try:
         for _ in range(n_episodes):
             done = False
-            observation = env.reset()
+            observation, info = env.reset()   # ⭐ 关键修复
 
             while not done:
                 action = agent.predict(observation)[0]
@@ -39,9 +40,6 @@ def evaluate(agent, eval_args, n_episodes=100):
         env.close()
 
     return all_histories
-
-
-
 
 if __name__ == '__main__':
 
