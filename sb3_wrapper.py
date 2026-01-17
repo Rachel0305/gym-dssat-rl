@@ -54,6 +54,8 @@ class GymDssatWrapper(gym.Wrapper):
     def __init__(self, env):
         self.formator = Formator(env)
         super().__init__(env)
+        # 添加 render_mode 属性，防止 SB3 兼容层报错
+        self.render_mode = None
         # using a normalized action space
         self.action_space = gym.spaces.Box(low=-1, high=1, shape=(len(self.formator.action_names),),
                                            dtype="float32")
@@ -71,13 +73,26 @@ class GymDssatWrapper(gym.Wrapper):
         self.last_info = {}
         self.last_obs = None
 
-    def reset(self):
-        return self.formator.format_observation(self.env.reset())
+    # def reset(self):
+    #     return self.formator.format_observation(self.env.reset())
+    def reset(self, *, seed=None, options=None):
+        if seed is not None:
+            try:
+                self.env.seed(seed)
+            except Exception:
+                pass
+
+        obs = self.env.reset()
+        obs = self.formator.format_observation(obs)
+        return obs, {}
+
+
 
     def step(self, action):
         # Rescale action from [-1, 1] to original action space interval
         denormalized_action = self.formator.denormalize_actions(action)
         formatted_action = self.formator.format_actions(denormalized_action)
+
         obs, reward, done, info = self.env.step(formatted_action)
 
         # handle `None` in obs, reward, and info on done step
@@ -88,7 +103,13 @@ class GymDssatWrapper(gym.Wrapper):
             self.last_info = info
 
         formatted_observation = self.formator.format_observation(obs)
-        return formatted_observation, reward, done, info
+
+        # Gymnasium compatibility
+        terminated = bool(done)
+        truncated = False  # DSSAT 不是 time-limit 截断
+
+        return formatted_observation, reward, terminated, truncated, info
+
 
     def close(self):
         return self.env.close()
