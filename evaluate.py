@@ -11,22 +11,36 @@ import numpy as np
 import pdb
 
 
+def get_inner_env(env):
+    while hasattr(env, "env"):
+        env = env.env
+    return env
+
+
 def evaluate(agent, eval_args, n_episodes=100):
-    # Create eval env
     source_env = gym.make('GymDssatPdi-v0', **eval_args)
     env = GymDssatWrapper(source_env)
+
     all_histories = []
     try:
         for _ in range(n_episodes):
             done = False
             observation = env.reset()
+
             while not done:
                 action = agent.predict(observation)[0]
-                observation, reward, done, _ = env.step(action=action)
-            all_histories.append(env.env._history)
+                observation, reward, terminated, truncated, info = env.step(action)
+                done = terminated or truncated
+
+            inner_env = get_inner_env(env)
+            all_histories.append(inner_env._history)
+
     finally:
         env.close()
+
     return all_histories
+
+
 
 
 if __name__ == '__main__':
@@ -40,15 +54,16 @@ if __name__ == '__main__':
     }
 
     print(f'###########################\n## MODE: {env_args["mode"]} ##\n###########################')
-
-    assert os.path.exists(f'./output/{env_args["mode"]}/best_model.zip')
+    print(env_args["mode"])
+    timestamp = "20260117_075817"  # 改成你实际的时间戳
+    assert os.path.exists(f'/tmp/output_{timestamp}/{env_args["mode"]}/best_model.zip')
 
 
     source_env = gym.make('gym_dssat_pdi:GymDssatPdi-v0', **env_args)
-    env = Monitor(GymDssatWrapper(source_env))
+    env = GymDssatWrapper(source_env)
     n_episodes = 1000
     try:
-        ppo_best = PPO.load(f'./output/{env_args["mode"]}/best_model')
+        ppo_best = PPO.load(f'/tmp/output_{timestamp}/{env_args["mode"]}/best_model')
         agents = {
             'null': NullAgent(env),
             'ppo': ppo_best,

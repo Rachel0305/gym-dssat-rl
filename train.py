@@ -1,15 +1,18 @@
+import datetime
 import logging
 import sys
 import os
 
+# 自动生成时间戳
+timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 # -----------------------------
 # 1. 强制使用 /tmp/logs 和 /tmp/output
-log_dir = "/tmp/logs"
-output_dir = "/tmp/output"
+log_dir = f"/tmp/logs_{timestamp}"
+output_dir = f"/tmp/output_{timestamp}"
 os.makedirs(log_dir, exist_ok=True)
 os.makedirs(output_dir, exist_ok=True)
 
-log_file_path = os.path.join(log_dir, "train_fer_log0116.txt")
+log_file_path = os.path.join(log_dir, f"train_fer_log_{timestamp}.txt")
 
 # 2. 初始化 logging
 logging.basicConfig(
@@ -79,7 +82,7 @@ if __name__ == "__main__":
         ppo_agent.learn(total_timesteps=total_timesteps, callback=eval_callback)
 
         # 保存最终模型
-        ppo_agent.save(os.path.join(path, "final_model"))
+        ppo_agent.save(os.path.join(path, f"final_model_{timestamp}"))
         logging.info("Training done")
 
     finally:

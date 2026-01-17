@@ -89,26 +89,30 @@ class GymDssatWrapper(gym.Wrapper):
 
 
     def step(self, action):
-        # Rescale action from [-1, 1] to original action space interval
         denormalized_action = self.formator.denormalize_actions(action)
         formatted_action = self.formator.format_actions(denormalized_action)
 
         obs, reward, done, info = self.env.step(formatted_action)
 
-        # handle `None` in obs, reward, and info on done step
-        if done:
-            obs, reward, info = self.last_obs, 0, self.last_info
-        else:
-            self.last_obs = obs
-            self.last_info = info
+        # 兼容处理
+        if obs is None:
+            obs = self.last_obs
+        if reward is None:
+            reward = 0
+        if info is None:
+            info = {}
+
+        self.last_obs = obs
+        self.last_info = info
 
         formatted_observation = self.formator.format_observation(obs)
 
-        # Gymnasium compatibility
+        # Gymnasium 接口
         terminated = bool(done)
         truncated = False  # DSSAT 不是 time-limit 截断
 
         return formatted_observation, reward, terminated, truncated, info
+
 
 
     def close(self):
