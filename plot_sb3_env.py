@@ -1,3 +1,5 @@
+# 这个代码是在自行配置的虚拟环境sb3_env中经过调试后可以运行的版本
+# 当时不知道有官方虚拟环境
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
@@ -327,4 +329,5 @@ if __name__ == '__main__':
     plot_rewards(history_dict=history_dict, mode=mode, quantile_range_legend=False,
                  saving_path=f'./figures/{mode}/{mode}Rewards.pdf')
     df_stats = get_statistics(history_dict=history_dict, mode=mode)
+
     df_stats.describe().round(1).to_csv(f'./output/{mode}/advanced_evaluation.csv')
