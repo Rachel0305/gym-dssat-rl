@@ -1,3 +1,5 @@
+# 这个代码是在自行配置的虚拟环境sb3_env中经过调试后可以运行的版本
+# 当时不知道有官方虚拟环境
 import datetime
 import logging
 import sys
@@ -87,3 +89,4 @@ if __name__ == "__main__":
 
     finally:
         env.close()
+
