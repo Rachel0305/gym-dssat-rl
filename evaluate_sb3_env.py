@@ -1,3 +1,5 @@
+# 这个代码是在自行配置的虚拟环境sb3_env中经过调试后可以运行的版本
+# 当时不知道有官方虚拟环境
 from stable_baselines3 import PPO
 from baseline_policies import NullAgent, ExpertAgent
 from sb3_wrapper import GymDssatWrapper
@@ -82,3 +84,4 @@ if __name__ == '__main__':
             pickle.dump(all_histories, handle, protocol=pickle.HIGHEST_PROTOCOL)
     finally:
         env.close()
+
